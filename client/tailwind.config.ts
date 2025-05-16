@@ -1,4 +1,4 @@
-import type { Config } from "tailwindcss"
+import type {Config} from "tailwindcss"
 
 const config = {
   darkMode: ["class"],
@@ -70,24 +70,24 @@ const config = {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
+          from: {height: "0"},
+          to: {height: "var(--radix-accordion-content-height)"},
         },
         "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+          from: {height: "var(--radix-accordion-content-height)"},
+          to: {height: "0"},
         },
         "fade-in": {
-          from: { opacity: "0" },
-          to: { opacity: "1" },
+          from: {opacity: "0"},
+          to: {opacity: "1"},
         },
         "slide-up": {
-          from: { transform: "translateY(10px)", opacity: "0" },
-          to: { transform: "translateY(0)", opacity: "1" },
+          from: {transform: "translateY(10px)", opacity: "0"},
+          to: {transform: "translateY(0)", opacity: "1"},
         },
         "pulse-light": {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.7" },
+          "0%, 100%": {opacity: "1"},
+          "50%": {opacity: "0.7"},
         },
       },
       animation: {
