@@ -1,9 +1,9 @@
-import {ContractUpload} from "@/components/contract-upload"
+import { ContractDashboard } from "@/components/contract-dashboard"
 
 export default function Home() {
-    return (
-        <div className="container mx-auto py-6">
-            <ContractUpload/>
-        </div>
-    )
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <ContractDashboard />
+    </div>
+  )
 }
