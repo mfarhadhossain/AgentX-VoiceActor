@@ -1,0 +1,4 @@
+# dependencies
+/agent/qdrant_storage
+/agent/venv
+/venv
