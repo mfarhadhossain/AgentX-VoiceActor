@@ -251,7 +251,7 @@ def create_legal_team(knowledge_base):
             "Review contracts thoroughly",
             "Identify key terms and potential issues",
             "Reference specific clauses from the document",
-            "Provide risk scores on a scale of 0-10"
+            "Provide risk scores on a scale of 0-10" # need to verify this, if its needed or not
         ],
         markdown=True
     )
@@ -259,7 +259,7 @@ def create_legal_team(knowledge_base):
     legal_strategist = Agent(
         name="Legal Strategist",
         role="Legal strategy specialist",
-        model=OpenAIChat(id="gpt-4-0125-preview"),
+        model=OpenAIChat(id="gpt-4.1"),
         knowledge=knowledge_base,
         search_knowledge=True,
         instructions=[
@@ -274,7 +274,7 @@ def create_legal_team(knowledge_base):
     legal_team = Agent(
         name="Legal Team Lead",
         role="Legal team coordinator",
-        model=OpenAIChat(id="gpt-4-0125-preview"),
+        model=OpenAIChat(id="gpt-4.1"),
         tools=(ReasoningTools(
             think=True,
             analyze=True,
@@ -287,13 +287,14 @@ def create_legal_team(knowledge_base):
         add_history_to_messages=True,
         num_history_runs=3,
         instructions=[
-            "Coordinate analysis between team members",
+            "CRITICAL: You MUST search the knowledge base to analyze the uploaded document content",
+            "Coordinate analysis between team members on the specific uploaded contract",
             "Provide comprehensive responses with clear structure",
             "Ensure all recommendations are properly sourced",
             "Reference specific parts of the uploaded document",
             "Always search the knowledge base before delegating tasks",
-            "Include a risk score (0-10) in your analysis",
-            "Structure your response with clear sections: Risk Findings, Key Clauses, Recommendations"
+            "Structure your response with clear sections: Risk Findings, Key Clauses, Recommendations",
+            "Do NOT provide generic contract advice - analyze the SPECIFIC uploaded document"
         ],
         show_tool_calls=True,
         markdown=True
@@ -374,36 +375,83 @@ async def analyze_contract(
 
         # Prepare query based on analysis type
         analysis_configs = {
-            "Contract Review": """Review this contract and provide:
-                1. An overall risk score (0-10)
-                2. Key risk findings (list at least 3)
-                3. Important clauses that need attention
-                4. Specific recommendations for negotiation""",
-            "Legal Research": """Research this document and provide:
-                1. A legal risk score (0-10)
-                2. Relevant legal precedents and cases
-                3. Key legal issues identified
-                4. Recommendations based on legal research""",
-            "Risk Assessment": """Analyze risks in this document and provide:
-                1. An overall risk score (0-10)
-                2. Major risk factors (list at least 3)
-                3. Clauses that pose the highest risk
-                4. Risk mitigation strategies""",
-            "Compliance Check": """Check compliance issues and provide:
-                1. A compliance score (0-10, where 10 is fully compliant)
-                2. Regulatory concerns identified
-                3. Non-compliant clauses
-                4. Steps to ensure compliance""",
-            "Custom Query": custom_query or "Analyze this document comprehensively"
+                    "Contract Review": {
+                        "query": """IMPORTANT: Search the knowledge base to analyze the uploaded contract document.
+
+                        Review this contract and identify key terms, obligations, and potential issues.
+                        Provide:
+                        1. An overall risk score (0-10) based on the specific contract terms
+                        2. Key risk findings from the document (list at least 3 specific issues with quotes)
+                        3. Important clauses that need attention (quote the actual text)
+                        4. Specific recommendations for negotiation based on the contract content
+
+                        You MUST search the knowledge base and quote specific sections from the uploaded document.""",
+                        "agents": ["Contract Analyst"],
+                        "description": "Detailed contract analysis focusing on terms and obligations"
+                    },
+                    "Legal Research": {
+                        "query": """IMPORTANT: Search the knowledge base to analyze the uploaded legal document.
+
+                        Research relevant cases and precedents related to this document.
+                        Provide:
+                        1. A legal risk score (0-10) based on the document content
+                        2. Relevant legal precedents and cases related to the document's terms
+                        3. Key legal issues identified in the specific document (with quotes)
+                        4. Recommendations based on legal research of the document
+
+                        You MUST search the knowledge base and reference the actual document content.""",
+                        "agents": ["Legal Researcher"],
+                        "description": "Research on relevant legal cases and precedents"
+                    },
+                    "Risk Assessment": {
+                        "query": """IMPORTANT: Search the knowledge base to analyze risks in the uploaded document.
+
+                        Analyze potential legal risks and liabilities in this document.
+                        Provide:
+                        1. An overall risk score (0-10) based on actual contract terms
+                        2. Major risk factors found in the document (list at least 3 with quotes)
+                        3. Clauses that pose the highest risk (quote the actual text)
+                        4. Risk mitigation strategies for the specific issues found
+
+                        You MUST search the knowledge base and analyze the actual uploaded document.""",
+                        "agents": ["Contract Analyst", "Legal Strategist"],
+                        "description": "Combined risk analysis and strategic assessment"
+                    },
+                    "Compliance Check": {
+                        "query": """IMPORTANT: Search the knowledge base to check compliance in the uploaded document.
+
+                        Check this document for regulatory compliance issues.
+                        Provide:
+                        1. A compliance score (0-10, where 10 is fully compliant)
+                        2. Regulatory concerns identified in the document (with specific quotes)
+                        3. Non-compliant clauses found (quote the actual text)
+                        4. Steps to ensure compliance based on the document's content
+
+                        You MUST search the knowledge base and analyze the actual uploaded document.""",
+                        "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
+                        "description": "Comprehensive compliance analysis"
+                    },
+                    "Custom Query": {
+                        "query": custom_query or "Analyze this document comprehensively",
+                        "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
+                        "description": "Custom analysis using all available agents"
+                    }
         }
 
+        config = analysis_configs.get(analysis_type, analysis_configs["Custom Query"])
+
         query = f"""
-        Using the uploaded document as reference:
+        CRITICAL: You have access to a knowledge base containing the uploaded document.
+        You MUST search the knowledge base to retrieve and analyze the actual document content.
 
-        {analysis_configs.get(analysis_type, analysis_configs["Custom Query"])}
+        Primary Analysis Task: {config['query']}
+        Focus Areas: {', '.join(config['agents'])}
 
-        Please search the knowledge base and provide specific references from the document.
-        Structure your response with clear sections and include specific clause references.
+        Remember:
+        - Search the knowledge base FIRST to retrieve document content
+        - Quote specific text from the document
+        - Base ALL analysis on the actual uploaded document, not generic contract knowledge
+        - If you cannot find the document in the knowledge base, explicitly state this
         """
 
         print(f"Running analysis with query type: {analysis_type}")

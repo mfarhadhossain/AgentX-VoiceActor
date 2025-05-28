@@ -69,15 +69,16 @@ export class ApiService {
 
     private mapBackendResponse(backendData: any): ContractData {
         // Map backend response to frontend data structure
-        console.log("Mapping backend response:", backendData)
-
-        return {
+        const tmp = {
             overallRiskScore: backendData.risk_score || 0.0,
             metrics: this.extractMetrics(backendData),
             riskSummary: backendData.risk_summary || [],
             clauses: backendData.clauses || [],
             negotiationTips: backendData.recommendations || [],
         }
+        console.log("Mapping backend response:", tmp)
+
+        return tmp
     }
 
     private extractMetrics(data: any): Metric[] {
