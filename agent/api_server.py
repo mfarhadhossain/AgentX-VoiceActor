@@ -31,24 +31,24 @@ app.add_middleware(
 
 COLLECTION_NAME = "legal_documents"
 
+
 class AnalysisResponse(BaseModel):
+    analysis: str  # The main analysis markdown
+    key_points: str  # The key points markdown
+    recommendations: str  # The recommendations markdown
+    # Optional: Keep some parsed data for the frontend UI
     risk_score: float
-    risk_summary: List[str]
-    clauses: List[Dict[str, str]]
-    recommendations: List[str]
-    complexity_score: float
-    legal_risk: float
-    compliance: float
 
 
 def extract_risk_score(text: str) -> float:
     """Extract risk score from agent response"""
     if not isinstance(text, str):
-        return 7.2
+        return -1.0
 
     # Look for patterns like "risk score: 7.5" or "7.5/10" or "7 / 10"
     patterns = [
-        r"risk\s*score[:\s]*\*?\*?(\d+\.?\d*)\s*[/]\s*10",  # Risk Score: 7/10 or **7 / 10**
+        # Risk Score: 7/10 or **7 / 10**
+        r"risk\s*score[:\s]*\*?\*?(\d+\.?\d*)\s*[/]\s*10",
         r"(\d+\.?\d*)\s*[/]\s*10",  # Any 7/10 pattern
         r"risk\s*score[:\s]*\*?\*?(\d+\.?\d*)",  # Risk score: 7
         r"score[:\s]*\*?\*?(\d+\.?\d*)",  # Score: 7
@@ -67,7 +67,8 @@ def extract_risk_score(text: str) -> float:
                     continue
 
     # Default if no score found
-    return 7.2
+    return -1.0
+
 
 def clean_markdown(text: str) -> str:
     """Remove markdown formatting from text"""
@@ -85,6 +86,7 @@ def clean_markdown(text: str) -> str:
     text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)
 
     return text.strip()
+
 
 def extract_clauses_from_markdown(text: str) -> List[Dict[str, str]]:
     """Extract clauses from markdown formatted text"""
@@ -130,6 +132,7 @@ def extract_clauses_from_markdown(text: str) -> List[Dict[str, str]]:
 
     return clauses[:4]  # Limit to 4 clauses
 
+
 def extract_clean_list_items(text: str) -> List[str]:
     """Extract and clean list items from markdown text"""
     items = []
@@ -152,6 +155,7 @@ def extract_clean_list_items(text: str) -> List[str]:
 
     return items
 
+
 def parse_agent_response(response) -> Dict[str, Any]:
     """Parse the agent response to extract structured data"""
     # Safely extract content
@@ -168,6 +172,8 @@ def parse_agent_response(response) -> Dict[str, Any]:
         content = str(response)
 
     print(f"Content length: {len(content)} chars")
+    # For debugging - print first 1000 chars to see what we're getting
+    print(f"Content preview: {content[:1000]}...")
 
     # Extract risk score with improved parsing
     risk_score = extract_risk_score(content)
@@ -178,7 +184,8 @@ def parse_agent_response(response) -> Dict[str, Any]:
 
     # Try to find risk findings section
     risk_section_pattern = r'(?:Key Risk Findings|Risk Findings|Risks?)[:\s]*\n(.*?)(?=\n#+|\n\n#+|$)'
-    risk_match = re.search(risk_section_pattern, content, re.IGNORECASE | re.DOTALL)
+    risk_match = re.search(risk_section_pattern, content,
+                           re.IGNORECASE | re.DOTALL)
 
     if risk_match:
         risk_text = risk_match.group(1)
@@ -192,7 +199,8 @@ def parse_agent_response(response) -> Dict[str, Any]:
             content,
             re.IGNORECASE
         )
-        risk_summary = [clean_markdown(s.strip()) for s in risk_sentences if len(s.strip()) > 30][:3]
+        risk_summary = [clean_markdown(
+            s.strip()) for s in risk_sentences if len(s.strip()) > 30][:3]
 
     # Extract clauses with better parsing
     clauses = extract_clauses_from_markdown(content)
@@ -202,7 +210,8 @@ def parse_agent_response(response) -> Dict[str, Any]:
 
     # Try to find recommendations section
     rec_section_pattern = r'(?:Recommendations?|Negotiation Tips?|Suggestions?)[:\s]*\n(.*?)(?=\n#+|\n\n#+|$)'
-    rec_match = re.search(rec_section_pattern, content, re.IGNORECASE | re.DOTALL)
+    rec_match = re.search(rec_section_pattern, content,
+                          re.IGNORECASE | re.DOTALL)
 
     if rec_match:
         rec_text = rec_match.group(1)
@@ -215,7 +224,8 @@ def parse_agent_response(response) -> Dict[str, Any]:
             content,
             re.IGNORECASE
         )
-        recommendations = [clean_markdown(s.strip()) for s in rec_sentences if len(s.strip()) > 30][:4]
+        recommendations = [clean_markdown(
+            s.strip()) for s in rec_sentences if len(s.strip()) > 30][:4]
 
     # Calculate scores based on risk score
     complexity_score = min(risk_score * 0.8 + len(clauses), 9.0)
@@ -260,6 +270,7 @@ def parse_agent_response(response) -> Dict[str, Any]:
 
     return result
 
+
 def create_legal_team(knowledge_base):
     """Create the legal agent team"""
     legal_researcher = Agent(
@@ -270,11 +281,10 @@ def create_legal_team(knowledge_base):
         knowledge=knowledge_base,
         search_knowledge=True,
         instructions=[
-            "IMPORTANT: Always search the knowledge base for specific document content before responding",
             "Find and cite relevant legal cases and precedents",
             "Provide detailed research summaries with sources",
-            "Reference specific sections from the uploaded document by searching the knowledge base",
-            "Quote actual text from the document when identifying issues"
+            "Reference specific sections from the uploaded document",
+            "Always search the knowledge base for relevant information"
         ],
         show_tool_calls=True,
         markdown=True
@@ -289,8 +299,7 @@ def create_legal_team(knowledge_base):
         instructions=[
             "Review contracts thoroughly",
             "Identify key terms and potential issues",
-            "Reference specific clauses from the document",
-            "Provide risk scores on a scale of 0-10" # need to verify this, if its needed or not
+            "Reference specific clauses from the document"
         ],
         markdown=True
     )
@@ -304,8 +313,7 @@ def create_legal_team(knowledge_base):
         instructions=[
             "Develop comprehensive legal strategies",
             "Provide actionable recommendations",
-            "Consider both risks and opportunities",
-            "Suggest negotiation tactics"
+            "Consider both risks and opportunities"
         ],
         markdown=True
     )
@@ -326,20 +334,18 @@ def create_legal_team(knowledge_base):
         add_history_to_messages=True,
         num_history_runs=3,
         instructions=[
-            "CRITICAL: You MUST search the knowledge base to analyze the uploaded document content",
-            "Coordinate analysis between team members on the specific uploaded contract",
-            "Provide comprehensive responses with clear structure",
+            "Coordinate analysis between team members",
+            "Provide comprehensive responses",
             "Ensure all recommendations are properly sourced",
             "Reference specific parts of the uploaded document",
-            "Always search the knowledge base before delegating tasks",
-            "Structure your response with clear sections: Risk Findings, Key Clauses, Recommendations",
-            "Do NOT provide generic contract advice - analyze the SPECIFIC uploaded document"
+            "Always search the knowledge base before delegating tasks"
         ],
         show_tool_calls=True,
         markdown=True
     )
 
     return legal_team
+
 
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze_contract(
@@ -357,7 +363,8 @@ async def analyze_contract(
 
     # Validate inputs
     if not all([openai_api_key, qdrant_api_key, qdrant_url]):
-        raise HTTPException(status_code=400, detail="Missing required API credentials")
+        raise HTTPException(
+            status_code=400, detail="Missing required API credentials")
 
     # Set environment variable
     os.environ['OPENAI_API_KEY'] = openai_api_key
@@ -376,7 +383,8 @@ async def analyze_contract(
         print("Successfully connected to Qdrant")
     except Exception as e:
         print(f"Qdrant connection error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to connect to Qdrant: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to connect to Qdrant: {str(e)}")
 
     # Save uploaded file
     temp_file_path = None
@@ -414,115 +422,129 @@ async def analyze_contract(
 
         # Prepare query based on analysis type
         analysis_configs = {
-                    "Contract Review": {
-                        "query": """IMPORTANT: Search the knowledge base to analyze the uploaded contract document.
-
-                        Review this contract and identify key terms, obligations, and potential issues.
-                        Provide:
-                        1. An overall risk score (0-10) based on the specific contract terms
-                        2. Key risk findings from the document (list at least 3 specific issues with quotes)
-                        3. Important clauses that need attention (quote the actual text)
-                        4. Specific recommendations for negotiation based on the contract content
-
-                        You MUST search the knowledge base and quote specific sections from the uploaded document.""",
-                        "agents": ["Contract Analyst"],
-                        "description": "Detailed contract analysis focusing on terms and obligations"
-                    },
-                    "Legal Research": {
-                        "query": """IMPORTANT: Search the knowledge base to analyze the uploaded legal document.
-
-                        Research relevant cases and precedents related to this document.
-                        Provide:
-                        1. A legal risk score (0-10) based on the document content
-                        2. Relevant legal precedents and cases related to the document's terms
-                        3. Key legal issues identified in the specific document (with quotes)
-                        4. Recommendations based on legal research of the document
-
-                        You MUST search the knowledge base and reference the actual document content.""",
-                        "agents": ["Legal Researcher"],
-                        "description": "Research on relevant legal cases and precedents"
-                    },
-                    "Risk Assessment": {
-                        "query": """IMPORTANT: Search the knowledge base to analyze risks in the uploaded document.
-
-                        Analyze potential legal risks and liabilities in this document.
-                        Provide:
-                        1. An overall risk score (0-10) based on actual contract terms
-                        2. Major risk factors found in the document (list at least 3 with quotes)
-                        3. Clauses that pose the highest risk (quote the actual text)
-                        4. Risk mitigation strategies for the specific issues found
-
-                        You MUST search the knowledge base and analyze the actual uploaded document.""",
-                        "agents": ["Contract Analyst", "Legal Strategist"],
-                        "description": "Combined risk analysis and strategic assessment"
-                    },
-                    "Compliance Check": {
-                        "query": """IMPORTANT: Search the knowledge base to check compliance in the uploaded document.
-
-                        Check this document for regulatory compliance issues.
-                        Provide:
-                        1. A compliance score (0-10, where 10 is fully compliant)
-                        2. Regulatory concerns identified in the document (with specific quotes)
-                        3. Non-compliant clauses found (quote the actual text)
-                        4. Steps to ensure compliance based on the document's content
-
-                        You MUST search the knowledge base and analyze the actual uploaded document.""",
-                        "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
-                        "description": "Comprehensive compliance analysis"
-                    },
-                    "Custom Query": {
-                        "query": custom_query or "Analyze this document comprehensively",
-                        "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
-                        "description": "Custom analysis using all available agents"
-                    }
+            "Contract Review": {
+                "query": "Review this contract and identify key terms, obligations, and potential issues.",
+                "agents": ["Contract Analyst"],
+                "description": "Detailed contract analysis focusing on terms and obligations"
+            },
+            "Legal Research": {
+                "query": "Research relevant cases and precedents related to this document.",
+                "agents": ["Legal Researcher"],
+                "description": "Research on relevant legal cases and precedents"
+            },
+            "Risk Assessment": {
+                "query": "Analyze potential legal risks and liabilities in this document.",
+                "agents": ["Contract Analyst", "Legal Strategist"],
+                "description": "Combined risk analysis and strategic assessment"
+            },
+            "Compliance Check": {
+                "query": "Check this document for regulatory compliance issues.",
+                "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
+                "description": "Comprehensive compliance analysis"
+            },
+            "Custom Query": {
+                "query": None,
+                "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
+                "description": "Custom analysis using all available agents"
+            }
         }
 
         config = analysis_configs.get(analysis_type, analysis_configs["Custom Query"])
 
-        query = f"""
-        CRITICAL: You have access to a knowledge base containing the uploaded document.
-        You MUST search the knowledge base to retrieve and analyze the actual document content.
+        # Build query exactly like agent_team.py
+        if analysis_type != "Custom Query":
+            combined_query = f"""
+            Using the uploaded document as reference:
 
-        Primary Analysis Task: {config['query']}
-        Focus Areas: {', '.join(config['agents'])}
+            Primary Analysis Task: {config['query']}
+            Focus Areas: {', '.join(config['agents'])}
 
-        Remember:
-        - Search the knowledge base FIRST to retrieve document content
-        - Quote specific text from the document
-        - Base ALL analysis on the actual uploaded document, not generic contract knowledge
-        - If you cannot find the document in the knowledge base, explicitly state this
-        """
+            Please search the knowledge base and provide specific references from the document.
+            """
+        else:
+            combined_query = f"""
+            Using the uploaded document as reference:
+
+            {custom_query}
+
+            Please search the knowledge base and provide specific references from the document.
+            Focus Areas: {', '.join(config['agents'])}
+            """
 
         print(f"Running analysis with query type: {analysis_type}")
         # Run analysis
-        response = legal_team.run(query)
-        print(f"Analysis complete. Response type: {type(response)}")
+        response = legal_team.run(combined_query)
 
-        # Parse response
-        analysis_result = parse_agent_response(response)
-        print(f"Parsed result: risk_score={analysis_result['risk_score']}")
 
-        # Ensure we have valid data
-        if not analysis_result["risk_summary"]:
-            analysis_result["risk_summary"] = ["Document analysis completed", "Review recommended", "Multiple considerations identified"]
+        # Extract the main analysis content
+        analysis_content = ""
+        if response.content:
+            analysis_content = response.content
+        else:
+            for message in response.messages:
+                if message.role == 'assistant' and message.content:
+                    analysis_content = message.content
+                    break
+        
+        print("Main analysis complete")
+        
+        # Second call: Key Points
+        print("Extracting key points...")
+        key_points_query = f"""Based on this previous analysis:    
+        {analysis_content}
+        
+        Please summarize the key points in bullet points.
+        Focus on insights from: {', '.join(config['agents'])}"""
+        
+        key_points_response = legal_team.run(key_points_query)
 
-        if not analysis_result["clauses"]:
-            analysis_result["clauses"] = [{
-                "title": "Document Review",
-                "content": "Full document review completed. Specific clause analysis available upon request.",
-                "highlight": ""
-            }]
+        key_points_content = ""
+        if key_points_response.content:
+            key_points_content = key_points_response.content
+        else:
+            for message in key_points_response.messages:
+                if message.role == 'assistant' and message.content:
+                    key_points_content = message.content
+                    break
+        
+        # Third call: Recommendations
+        print("Generating recommendations...")
+        recommendations_query = f"""Based on this previous analysis:
+        {analysis_content}
+        
+        What are your key recommendations based on the analysis, the best course of action?
+        Provide specific recommendations from: {', '.join(config['agents'])}"""
+        
+        recommendations_response = legal_team.run(recommendations_query)
+        
+        recommendations_content = ""
+        if recommendations_response.content:
+            recommendations_content = recommendations_response.content
+        else:
+            for message in recommendations_response.messages:
+                if message.role == 'assistant' and message.content:
+                    recommendations_content = message.content
+                    break
 
-        if not analysis_result["recommendations"]:
-            analysis_result["recommendations"] = ["Seek legal counsel for detailed review", "Consider negotiating key terms", "Ensure all parties understand obligations"]
-
-        return AnalysisResponse(**analysis_result)
+        # Now parse all three responses together
+        print("Parsing combined responses...")
+        
+        # Extract risk score from the analysis (simple extraction)
+        risk_score = extract_risk_score(analysis_content)
+        
+        return AnalysisResponse(
+            analysis=analysis_content,
+            key_points=key_points_content,
+            recommendations=recommendations_content,
+            risk_score=risk_score
+        )
 
     except Exception as e:
         print(f"Analysis error: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Analysis failed: {str(e)}")
     finally:
         # Clean up
         if temp_file_path and os.path.exists(temp_file_path):
@@ -531,6 +553,7 @@ async def analyze_contract(
                 print(f"Cleaned up temp file: {temp_file_path}")
             except:
                 pass
+
 
 @app.get("/health")
 async def health_check():
