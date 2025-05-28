@@ -60,71 +60,17 @@ export class ApiService {
             const data = JSON.parse(responseText)
             console.log("Parsed response data:", data)
 
-            return this.mapBackendResponse(data)
+            // Return the simplified structure
+            return {
+                analysis: data.analysis,
+                keyPoints: data.key_points,
+                recommendations: data.recommendations,
+                riskScore: data.risk_score
+            }
         } catch (error) {
             console.error("API call error:", error)
             throw error
         }
-    }
-
-    private mapBackendResponse(backendData: any): ContractData {
-        // Map backend response to frontend data structure
-        const tmp = {
-            overallRiskScore: backendData.risk_score || 0.0,
-            metrics: this.extractMetrics(backendData),
-            riskSummary: backendData.risk_summary || [],
-            clauses: backendData.clauses || [],
-            negotiationTips: backendData.recommendations || [],
-        }
-        console.log("Mapping backend response:", tmp)
-
-        return tmp
-    }
-
-    private extractMetrics(data: any): Metric[] {
-        // Extract metrics from backend response
-        const metrics: Metric[] = []
-
-        if (data.complexity_score !== undefined) {
-            metrics.push({
-                name: "Contract Complexity",
-                score: data.complexity_score,
-                risk: this.scoreToRisk(data.complexity_score)
-            })
-        }
-
-        if (data.legal_risk !== undefined) {
-            metrics.push({
-                name: "Legal Risk Assessment",
-                score: data.legal_risk,
-                risk: this.scoreToRisk(data.legal_risk)
-            })
-        }
-
-        if (data.compliance !== undefined) {
-            metrics.push({
-                name: "Compliance Score",
-                score: data.compliance,
-                risk: this.scoreToRisk(10 - data.compliance) // Invert for risk
-            })
-        }
-
-        // If no metrics, return defaults
-        if (metrics.length === 0) {
-            return [
-                { name: "Contract Complexity", score: 6.5, risk: "medium" },
-                { name: "Legal Risk Assessment", score: 8.2, risk: "high" },
-                { name: "Compliance Score", score: 3.1, risk: "low" },
-            ]
-        }
-
-        return metrics
-    }
-
-    private scoreToRisk(score: number): "low" | "medium" | "high" {
-        if (score <= 3.3) return "low"
-        if (score <= 6.6) return "medium"
-        return "high"
     }
 }
 
