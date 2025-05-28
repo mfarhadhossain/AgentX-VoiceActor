@@ -5,75 +5,48 @@ import { UploadCard } from "./upload-card"
 import { RiskScoreCard } from "./risk-score-card"
 import { TabbedDetails } from "./tabbed-details"
 import { ProjectHeader } from "./project-header"
-import type { ContractData } from "@/lib/types"
+import { ApiConfigComponent } from "./api-config"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import type { ContractData, ApiConfig, AnalysisType } from "@/lib/types"
+import { apiService } from "@/lib/api-service"
 
 export function ContractDashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [contractData, setContractData] = useState<ContractData | null>(null)
   const [isUploadMinimized, setIsUploadMinimized] = useState(false)
+  const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null)
+  const [analysisType, setAnalysisType] = useState<AnalysisType>({ type: "Contract Review" })
+  const [customQuery, setCustomQuery] = useState("")
+
+  const handleApiConfigChange = (config: ApiConfig) => {
+    setApiConfig(config)
+    apiService.setConfig(config)
+  }
 
   const handleFileUpload = async (file: File) => {
+    if (!apiConfig) {
+      alert("Please configure API settings first")
+      return
+    }
+
     setIsAnalyzing(true)
-    setIsUploadMinimized(true) // Minimize upload card when analysis starts
+    setIsUploadMinimized(true)
 
-    // Simulate contract analysis
-    setTimeout(() => {
-      // Mock data - in a real app, this would come from your API
-      const mockData: ContractData = {
-        overallRiskScore: 7.2,
-        metrics: [
-          { name: "Client Trustworthiness", score: 6.5, risk: "medium" },
-          { name: "Audition Sample Length", score: 8.2, risk: "high" },
-          { name: "Completed Projects Count", score: 3.1, risk: "low" },
-          { name: "Hourly Rate", score: 7.8, risk: "high" },
-          { name: "GenAI Usage Transparency", score: 0, risk: "high", isBoolean: true, value: false },
-          { name: "System Accuracy", score: 8.5, risk: "high" },
-        ],
-        riskSummary: [
-          "Contract contains unlimited revisions clause with no additional compensation",
-          "Rights extend to AI voice training without explicit compensation",
-          "Non-compete clause is overly restrictive (3 years, global scope)",
-        ],
-        clauses: [
-          {
-            title: "Revisions Clause",
-            content:
-              "Talent agrees to provide unlimited revisions at no additional cost until Client is satisfied with the final product.",
-            highlight: "unlimited revisions at no additional cost",
-            risk: "high",
-          },
-          {
-            title: "Rights Assignment",
-            content:
-              "Client shall own all rights to the recordings in perpetuity, including the right to use recordings for training AI voice models.",
-            highlight: "training AI voice models",
-            risk: "high",
-          },
-          {
-            title: "Non-Compete",
-            content:
-              "Talent agrees not to work with any competing business in the same industry for a period of three (3) years following the completion of this project, worldwide.",
-            highlight: "three (3) years following the completion of this project, worldwide",
-            risk: "high",
-          },
-          {
-            title: "Payment Terms",
-            content: "Payment shall be made within 60 days of project completion and approval by Client.",
-            highlight: "60 days",
-            risk: "medium",
-          },
-        ],
-        negotiationTips: [
-          "Request a cap on the number of revision rounds (suggest 2-3 rounds)",
-          "Add explicit compensation for AI training rights or exclude these rights entirely",
-          "Negotiate non-compete to 6 months and limit to specific geographic region",
-          "Request payment terms of net-30 instead of net-60",
-        ],
-      }
+    try {
+      const analysis: AnalysisType = analysisType.type === "Custom Query"
+          ? { ...analysisType, customQuery }
+          : analysisType
 
-      setContractData(mockData)
+      const data = await apiService.uploadAndAnalyze(file, analysis)
+      setContractData(data)
+    } catch (error) {
+      console.error("Analysis failed:", error)
+      alert("Analysis failed. Please check your API configuration and try again.")
+    } finally {
       setIsAnalyzing(false)
-    }, 3000)
+    }
   }
 
   const handleNewUpload = () => {
@@ -83,31 +56,69 @@ export function ContractDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <ProjectHeader />
+      <div className="min-h-screen bg-white">
+        <ProjectHeader />
 
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className={`transition-all duration-300 ${isUploadMinimized ? "mb-4" : "mb-8"}`}>
-          <UploadCard
-            onFileUpload={handleFileUpload}
-            isAnalyzing={isAnalyzing}
-            isMinimized={isUploadMinimized}
-            onNewUpload={handleNewUpload}
-            hasContract={!!contractData}
-          />
-        </div>
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          {!apiConfig && (
+              <ApiConfigComponent onConfigChange={handleApiConfigChange} />
+          )}
 
-        {contractData && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <RiskScoreCard data={contractData} />
+          <div className="mb-6 space-y-4">
+            <div>
+              <Label htmlFor="analysis-type">Analysis Type</Label>
+              <Select
+                  value={analysisType.type}
+                  onValueChange={(value) => setAnalysisType({ type: value as AnalysisType["type"] })}
+              >
+                <SelectTrigger id="analysis-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Contract Review">Contract Review</SelectItem>
+                  <SelectItem value="Legal Research">Legal Research</SelectItem>
+                  <SelectItem value="Risk Assessment">Risk Assessment</SelectItem>
+                  <SelectItem value="Compliance Check">Compliance Check</SelectItem>
+                  <SelectItem value="Custom Query">Custom Query</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="lg:col-span-2">
-              <TabbedDetails data={contractData} />
-            </div>
+
+            {analysisType.type === "Custom Query" && (
+                <div>
+                  <Label htmlFor="custom-query">Custom Query</Label>
+                  <Textarea
+                      id="custom-query"
+                      value={customQuery}
+                      onChange={(e) => setCustomQuery(e.target.value)}
+                      placeholder="Enter your specific legal analysis query..."
+                      rows={3}
+                  />
+                </div>
+            )}
           </div>
-        )}
+
+          <div className={`transition-all duration-300 ${isUploadMinimized ? "mb-4" : "mb-8"}`}>
+            <UploadCard
+                onFileUpload={handleFileUpload}
+                isAnalyzing={isAnalyzing}
+                isMinimized={isUploadMinimized}
+                onNewUpload={handleNewUpload}
+                hasContract={!!contractData}
+            />
+          </div>
+
+          {contractData && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                  <RiskScoreCard data={contractData} />
+                </div>
+                <div className="lg:col-span-2">
+                  <TabbedDetails data={contractData} />
+                </div>
+              </div>
+          )}
+        </div>
       </div>
-    </div>
   )
 }
