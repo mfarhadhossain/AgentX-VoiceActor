@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { UploadCard } from "./upload-card"
-import { RiskScoreCard } from "./risk-score-card"
+// import { RiskScoreCard } from "./risk-score-card"
 import { TabbedDetails } from "./tabbed-details"
 import { ProjectHeader } from "./project-header"
 import { ApiConfigComponent } from "./api-config"
@@ -66,7 +66,7 @@ export function ContractDashboard() {
 
           <div className="mb-6 space-y-4">
             <div>
-              <Label htmlFor="analysis-type">Analysis Type</Label>
+              <Label htmlFor="analysis-type">Select Analysis Type</Label>
               <Select
                   value={analysisType.type}
                   onValueChange={(value) => setAnalysisType({ type: value as AnalysisType["type"] })}
@@ -110,9 +110,9 @@ export function ContractDashboard() {
 
           {contractData && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1">
-                  <RiskScoreCard data={contractData} />
-                </div>
+                {/*<div className="lg:col-span-1">*/}
+                {/*  <RiskScoreCard data={contractData} />*/}
+                {/*</div>*/}
                 <div className="lg:col-span-2">
                   <TabbedDetails data={contractData} />
                 </div>

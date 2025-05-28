@@ -1,24 +1,18 @@
+// Updated types.ts
 export interface ContractData {
-  overallRiskScore: number
-  metrics: Metric[]
-  riskSummary: string[]
-  clauses: Clause[]
-  negotiationTips: string[]
+  analysis: string  // Raw markdown from main analysis
+  keyPoints: string  // Raw markdown from key points
+  recommendations: string  // Raw markdown from recommendations
+  riskScore: number
 }
 
+// Keep the old interfaces for any existing components that need them
 export interface Metric {
   name: string
   score: number
   risk: "low" | "medium" | "high"
   isBoolean?: boolean
   value?: boolean
-}
-
-export interface Clause {
-  title: string
-  content: string
-  highlight: string
-  risk: "low" | "medium" | "high"
 }
 
 export interface ApiConfig {
