@@ -233,7 +233,7 @@ def main():
                                 legal_researcher = Agent(
                                     name="Legal Researcher",
                                     role="Legal research specialist",
-                                    model=OpenAIChat(id="gpt-4o-mini"),
+                                    model=OpenAIChat(id="gpt-4.1"),
                                     tools=[DuckDuckGoTools()],
                                     knowledge=st.session_state.reference_db,
                                     search_knowledge=True,
@@ -250,7 +250,7 @@ def main():
                                 contract_analyst = Agent(
                                     name="Contract Analyst",
                                     role="Contract analysis specialist",
-                                    model=OpenAIChat(id="gpt-4o-mini"),
+                                    model=OpenAIChat(id="gpt-4.1"),
                                     knowledge=st.session_state.knowledge_base,
                                     search_knowledge=True,
                                     instructions=[
@@ -261,24 +261,10 @@ def main():
                                     markdown=True
                                 )
 
-                                risk_assessor = Agent(
-                                    name="Risk Assessor",
-                                    role="Risk assessing specialist",
-                                    model=OpenAIChat(id="gpt-4o-mini"),
-                                    knowledge=st.session_state.knowledge_base,
-                                    search_knowledge=True,
-                                    instructions=[
-                                        "Based on the results from other agents, provide a risk score",
-                                        "The risk score should be a number between 0-100. 100 is the highest risk."
-                                    ],
-                                    expected_output="Only a number, between 0-100",
-                                    markdown=True
-                                )
-                                
                                 legal_strategist = Agent(
                                     name="Legal Strategist", 
                                     role="Legal strategy specialist",
-                                    model=OpenAIChat(id="gpt-4o-mini"),
+                                    model=OpenAIChat(id="gpt-4.1"),
                                     knowledge=st.session_state.knowledge_base,
                                     search_knowledge=True,
                                     instructions=[
@@ -293,14 +279,14 @@ def main():
                                 st.session_state.legal_team = Team(
                                     name="Legal Team Lead",
                                     mode = "coordinate",
-                                    model=OpenAIChat(id="gpt-4o-mini"),
+                                    model=OpenAIChat(id="gpt-4.1"),
                                     tools=(ReasoningTools(
                                         think=True,
                                         analyze=True,
                                         add_instructions=True,
                                         add_few_shot=True,
                                         ),),
-                                    members=[legal_researcher, contract_analyst, legal_strategist, risk_assessor],
+                                    members=[legal_researcher, contract_analyst, legal_strategist],
                                     knowledge=st.session_state.knowledge_base,
                                     search_knowledge=True,
                                     add_datetime_to_instructions=True,
@@ -370,7 +356,7 @@ def main():
             },
             "Risk Assessment": {
                 "query": "Analyze potential legal risks and liabilities in this document based on common risk assessment frameworks such as NIST, OWASP, MITRE.",
-                "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist", "Risk Assessor"],
+                "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
                 "description": "Combined risk analysis and strategic assessment"
             },
             "Custom Query": {
@@ -423,27 +409,11 @@ def main():
                             """
 
                         response = st.session_state.legal_team.run(combined_query)
-
                         
                         # Display results in tabs
                         tabs = st.tabs(["Analysis", "Key Points", "Recommendations"])
                         
                         with tabs[0]:
-                            if analysis_type == "Risk Assessment":
-                                # If risk assessment, also get the risk score
-                                risk_score_response = st.session_state.legal_team.run(
-                                    f"""Based on the previous analysis:
-                                    {response.content}
-                                    
-                                    Provide a risk score between 0-100 based on the analysis. No need to explain the score, just return the number without any other outputs.
-                                    """
-                                )
-                                if risk_score_response.content:
-                                    st.markdown(f"### Risk Score: {risk_score_response.content}")
-                                else:
-                                    for message in risk_score_response.messages:
-                                        if message.role == 'assistant' and message.content:
-                                            st.markdown(f"### Risk Score: {message.content}")
                             st.markdown("### Detailed Analysis")
                             if response.content:
                                 st.markdown(response.content)
@@ -451,8 +421,7 @@ def main():
                                 for message in response.messages:
                                     if message.role == 'assistant' and message.content:
                                         st.markdown(message.content)
-
-                            
+                        
                         with tabs[1]:
                             st.markdown("### Key Points")
                             key_points_response = st.session_state.legal_team.run(
