@@ -369,7 +369,7 @@ def main():
                 "description": "Research on relevant legal cases and precedents"
             },
             "Risk Assessment": {
-                "query": "Analyze potential legal risks and liabilities in this document based on common risk assessment frameworks such as NIST, OWASP, MITRE. Based on the analysis, show the user a risk score.",
+                "query": "Analyze potential legal risks and liabilities in this document based on common risk assessment frameworks such as NIST, OWASP, MITRE.",
                 "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist", "Risk Assessor"],
                 "description": "Combined risk analysis and strategic assessment"
             },
