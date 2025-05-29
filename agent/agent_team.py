@@ -1,11 +1,13 @@
 import streamlit as st
 from agno.agent import Agent
+from agno.agent import AgentKnowledge
 from agno.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from agno.vectordb.qdrant import Qdrant
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.reasoning import ReasoningTools
 from agno.models.openai import OpenAIChat
 from agno.embedder.openai import OpenAIEmbedder
+from agno.team.team import Team
 import tempfile
 import os
 from agno.document.chunking.document import DocumentChunking
@@ -20,6 +22,8 @@ def init_session_state():
         st.session_state.qdrant_url = None
     if 'vector_db' not in st.session_state:
         st.session_state.vector_db = None
+    if 'reference_db' not in st.session_state:
+        st.session_state.reference_db = None
     if 'legal_team' not in st.session_state:
         st.session_state.legal_team = None
     if 'knowledge_base' not in st.session_state:
@@ -28,7 +32,8 @@ def init_session_state():
     if 'processed_files' not in st.session_state:
         st.session_state.processed_files = set()
 
-COLLECTION_NAME = "legal_documents"  # Define your collection name
+COLLECTION_NAME = "mydocuments"  # Define your collection name
+REFERENCE_NAME = "legal_references"
 
 def init_qdrant():
     """Initialize Qdrant client with configured settings."""
@@ -48,6 +53,55 @@ def init_qdrant():
         return vector_db
     except Exception as e:
         st.error(f"🔴 Qdrant connection failed: {str(e)}")
+        return None
+
+def init_reference():
+    if not all([st.session_state.qdrant_api_key, st.session_state.qdrant_url]):
+        return None
+    try:
+        reference_db = Qdrant(
+            collection=REFERENCE_NAME,
+            url=st.session_state.qdrant_url,
+            api_key=st.session_state.qdrant_api_key,
+            embedder=OpenAIEmbedder(
+                id="text-embedding-3-small", 
+                api_key=st.session_state.openai_api_key
+            )
+        )
+        return reference_db
+    
+    except Exception as e:
+        st.error(f"🔴 Reference connection failed: {str(e)}")
+        return None
+
+def process_reference(uploaded_file, vector_db: Qdrant):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            temp_file.write(uploaded_file.getvalue())
+            temp_file_path = temp_file.name
+        
+        # Create a PDFKnowledgeBase with the vector_db
+        knowledge_base = PDFKnowledgeBase(
+            path=temp_file_path,  # Single string path, not a list
+            vector_db=vector_db,
+            reader=PDFReader(),
+            chunking_strategy=DocumentChunking(
+                chunk_size=1000,
+                overlap=200
+            )
+        )
+
+        knowledge_base.load(recreate=False, upsert=False)
+        
+        try:
+            os.unlink(temp_file_path)
+        except Exception:
+            pass
+        
+        return knowledge_base
+
+    except Exception as e:
+        st.error(f"🔴 Reference process failed: {str(e)}")
         return None
 
 def process_document(uploaded_file, vector_db: Qdrant):
@@ -146,10 +200,14 @@ def main():
                 if not st.session_state.vector_db:
                     # Make sure we're initializing a QdrantClient here
                     st.session_state.vector_db = init_qdrant()
+                    st.session_state.reference_db = init_reference()
                     if st.session_state.vector_db:
                         st.success("Successfully connected to Qdrant!")
+                    if st.session_state.reference_db:
+                        st.success("Successfully connected to Reference!")
             except Exception as e:
                 st.error(f"Failed to connect to Qdrant: {str(e)}")
+                
 
         st.divider()
 
@@ -164,9 +222,10 @@ def main():
                         try:
                             # Process the document and get the knowledge base
                             knowledge_base = process_document(uploaded_file, st.session_state.vector_db)
-                            
+                            reference_base = process_reference(uploaded_file, st.session_state.reference_db)
                             if knowledge_base:
                                 st.session_state.knowledge_base = knowledge_base
+                                st.session_state.reference_db = reference_base
                                 # Add the file to processed files
                                 st.session_state.processed_files.add(uploaded_file.name)
                                 
@@ -174,15 +233,15 @@ def main():
                                 legal_researcher = Agent(
                                     name="Legal Researcher",
                                     role="Legal research specialist",
-                                    model=OpenAIChat(id="gpt-4.1"),
+                                    model=OpenAIChat(id="gpt-4o-mini"),
                                     tools=[DuckDuckGoTools()],
-                                    knowledge=st.session_state.knowledge_base,
+                                    knowledge=st.session_state.reference_db,
                                     search_knowledge=True,
                                     instructions=[
                                         "Find and cite relevant legal cases and precedents",
                                         "Provide detailed research summaries with sources",
-                                        "Reference specific sections from the uploaded document",
-                                        "Always search the knowledge base for relevant information"
+                                        "Reference specific sections from the knowledge base",
+                                        "Always search the reference knowledge base for relevant information"
                                     ],
                                     show_tool_calls=True,
                                     markdown=True
@@ -191,7 +250,7 @@ def main():
                                 contract_analyst = Agent(
                                     name="Contract Analyst",
                                     role="Contract analysis specialist",
-                                    model=OpenAIChat(id="gpt-4.1"),
+                                    model=OpenAIChat(id="gpt-4o-mini"),
                                     knowledge=st.session_state.knowledge_base,
                                     search_knowledge=True,
                                     instructions=[
@@ -202,10 +261,24 @@ def main():
                                     markdown=True
                                 )
 
+                                risk_assessor = Agent(
+                                    name="Risk Assessor",
+                                    role="Risk assessing specialist",
+                                    model=OpenAIChat(id="gpt-4o-mini"),
+                                    knowledge=st.session_state.knowledge_base,
+                                    search_knowledge=True,
+                                    instructions=[
+                                        "Based on the results from other agents, provide a risk score",
+                                        "The risk score should be a number between 0-100. 100 is the highest risk."
+                                    ],
+                                    expected_output="Only a number, between 0-100",
+                                    markdown=True
+                                )
+                                
                                 legal_strategist = Agent(
                                     name="Legal Strategist", 
                                     role="Legal strategy specialist",
-                                    model=OpenAIChat(id="gpt-4.1"),
+                                    model=OpenAIChat(id="gpt-4o-mini"),
                                     knowledge=st.session_state.knowledge_base,
                                     search_knowledge=True,
                                     instructions=[
@@ -217,29 +290,31 @@ def main():
                                 )
 
                                 # Legal Agent Team
-                                st.session_state.legal_team = Agent(
+                                st.session_state.legal_team = Team(
                                     name="Legal Team Lead",
-                                    role="Legal team coordinator",
-                                    model=OpenAIChat(id="gpt-4.1"),
+                                    mode = "coordinate",
+                                    model=OpenAIChat(id="gpt-4o-mini"),
                                     tools=(ReasoningTools(
                                         think=True,
                                         analyze=True,
                                         add_instructions=True,
                                         add_few_shot=True,
                                         ),),
-                                    team=[legal_researcher, contract_analyst, legal_strategist],
+                                    members=[legal_researcher, contract_analyst, legal_strategist, risk_assessor],
                                     knowledge=st.session_state.knowledge_base,
                                     search_knowledge=True,
-                                    add_history_to_messages=True,
-                                    num_history_runs=3,
+                                    add_datetime_to_instructions=True,
                                     instructions=[
                                         "Coordinate analysis between team members",
+                                        "The legal researcher can provide references but cannot see the exact uploaded contract",
                                         "Provide comprehensive responses",
                                         "Ensure all recommendations are properly sourced",
                                         "Reference specific parts of the uploaded document",
                                         "Always search the knowledge base before delegating tasks"
                                     ],
                                     show_tool_calls=True,
+                                    debug_mode=True,
+                                    show_members_responses=True,
                                     markdown=True
                                 )
                                 
@@ -259,7 +334,6 @@ def main():
                     "Contract Review",
                     "Legal Research",
                     "Risk Assessment",
-                    "Compliance Check",
                     "Custom Query"
                 ]
             )
@@ -277,7 +351,6 @@ def main():
             "Contract Review": "📑",
             "Legal Research": "🔍",
             "Risk Assessment": "⚠️",
-            "Compliance Check": "✅",
             "Custom Query": "💭"
         }
 
@@ -296,14 +369,9 @@ def main():
                 "description": "Research on relevant legal cases and precedents"
             },
             "Risk Assessment": {
-                "query": "Analyze potential legal risks and liabilities in this document.",
-                "agents": ["Contract Analyst", "Legal Strategist"],
+                "query": "Analyze potential legal risks and liabilities in this document based on common risk assessment frameworks such as NIST, OWASP, MITRE. Based on the analysis, show the user a risk score.",
+                "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist", "Risk Assessor"],
                 "description": "Combined risk analysis and strategic assessment"
-            },
-            "Compliance Check": {
-                "query": "Check this document for regulatory compliance issues.",
-                "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
-                "description": "Comprehensive compliance analysis"
             },
             "Custom Query": {
                 "query": None,
@@ -355,11 +423,27 @@ def main():
                             """
 
                         response = st.session_state.legal_team.run(combined_query)
+
                         
                         # Display results in tabs
                         tabs = st.tabs(["Analysis", "Key Points", "Recommendations"])
                         
                         with tabs[0]:
+                            if analysis_type == "Risk Assessment":
+                                # If risk assessment, also get the risk score
+                                risk_score_response = st.session_state.legal_team.run(
+                                    f"""Based on the previous analysis:
+                                    {response.content}
+                                    
+                                    Provide a risk score between 0-100 based on the analysis. No need to explain the score, just return the number without any other outputs.
+                                    """
+                                )
+                                if risk_score_response.content:
+                                    st.markdown(f"### Risk Score: {risk_score_response.content}")
+                                else:
+                                    for message in risk_score_response.messages:
+                                        if message.role == 'assistant' and message.content:
+                                            st.markdown(f"### Risk Score: {message.content}")
                             st.markdown("### Detailed Analysis")
                             if response.content:
                                 st.markdown(response.content)
@@ -367,7 +451,8 @@ def main():
                                 for message in response.messages:
                                     if message.role == 'assistant' and message.content:
                                         st.markdown(message.content)
-                        
+
+                            
                         with tabs[1]:
                             st.markdown("### Key Points")
                             key_points_response = st.session_state.legal_team.run(
