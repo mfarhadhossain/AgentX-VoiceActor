@@ -29,8 +29,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-COLLECTION_NAME = "legal_documents"
-
+# Hardcoded Qdrant configuration - update these values for your setup
+QDRANT_CONFIG = {
+    "url": "https://fd0f2387-645d-4d44-bb59-02909affd364.us-west-1-0.aws.cloud.qdrant.io",  # Update this
+    "api_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.G6ZK06QnWMBzKXfDr0quLl_bdL7yXK1z0azfrnIpgXU",  # Update this
+    "collection_name": "legal_documents"
+}
 
 class AnalysisResponse(BaseModel):
     analysis: str  # The main analysis markdown
@@ -351,8 +355,6 @@ def create_legal_team(knowledge_base):
 async def analyze_contract(
     file: UploadFile = File(...),
     openai_api_key: str = Form(...),
-    qdrant_api_key: str = Form(...),
-    qdrant_url: str = Form(...),
     analysis_type: str = Form(...),
     custom_query: Optional[str] = Form(None)
 ):
@@ -362,7 +364,7 @@ async def analyze_contract(
     print(f"File: {file.filename}, Size: {file.size}")
 
     # Validate inputs
-    if not all([openai_api_key, qdrant_api_key, qdrant_url]):
+    if not all([openai_api_key]):
         raise HTTPException(
             status_code=400, detail="Missing required API credentials")
 
@@ -372,9 +374,9 @@ async def analyze_contract(
     # Initialize Qdrant
     try:
         vector_db = Qdrant(
-            collection=COLLECTION_NAME,
-            url=qdrant_url,
-            api_key=qdrant_api_key,
+            collection=QDRANT_CONFIG["collection_name"],
+            url=QDRANT_CONFIG["url"],
+            api_key=QDRANT_CONFIG["api_key"],
             embedder=OpenAIEmbedder(
                 id="text-embedding-3-small",
                 api_key=openai_api_key

@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { UploadCard } from "./upload-card"
+import {useEffect, useState} from "react"
+import {UploadCard} from "./upload-card"
 // import { RiskScoreCard } from "./risk-score-card"
-import { TabbedDetails } from "./tabbed-details"
-import { ProjectHeader } from "./project-header"
-import { ApiConfigComponent } from "./api-config"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import type { ContractData, ApiConfig, AnalysisType } from "@/lib/types"
-import { apiService } from "@/lib/api-service"
+import {TabbedDetails} from "./tabbed-details"
+import {ProjectHeader} from "./project-header"
+import {ApiConfigComponent} from "./api-config"
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
+import {Textarea} from "@/components/ui/textarea"
+import {Label} from "@/components/ui/label"
+import type {AnalysisType, ApiConfig, ContractData} from "@/lib/types"
+import {apiService} from "@/lib/api-service"
 
 // Helper function to safely use localStorage
 const safeLocalStorage = {
@@ -66,12 +66,16 @@ export function ContractDashboard() {
           setIsUploadMinimized(true) // Minimize upload card if we have data
         }
 
-        // Load API config
+        // Load API config (only OpenAI key now)
         const storedApiConfig = safeLocalStorage.getItem('api-config')
         if (storedApiConfig) {
           const parsedConfig = JSON.parse(storedApiConfig)
-          setApiConfig(parsedConfig)
-          apiService.setConfig(parsedConfig)
+          // Ensure we only use the OpenAI key
+          const cleanConfig = {
+            openaiApiKey: parsedConfig.openaiApiKey || ""
+          }
+          setApiConfig(cleanConfig)
+          apiService.setConfig(cleanConfig)
         }
 
         // Load analysis type
@@ -121,13 +125,12 @@ export function ContractDashboard() {
   }
 
   const handleFileUpload = async (file: File) => {
-    if (!apiConfig) {
-      alert("Please configure API settings first")
+    if (!apiConfig?.openaiApiKey) {
+      alert("Please configure your OpenAI API key first")
       return
     }
 
     setIsAnalyzing(true)
-    setIsUploadMinimized(true)
 
     try {
       const analysis: AnalysisType = analysisType.type === "Custom Query"
@@ -137,8 +140,9 @@ export function ContractDashboard() {
       const data = await apiService.uploadAndAnalyze(file, analysis)
       setContractData(data)
 
-      // Persist the new contract data immediately
       safeLocalStorage.setItem('contract-data', JSON.stringify(data))
+
+      setIsUploadMinimized(true)
     } catch (error) {
       console.error("Analysis failed:", error)
       alert("Analysis failed. Please check your API configuration and try again.")
@@ -152,7 +156,6 @@ export function ContractDashboard() {
     setIsUploadMinimized(false)
     setIsAnalyzing(false)
 
-    // Clear persisted contract data but keep other settings
     safeLocalStorage.removeItem('contract-data')
     safeLocalStorage.removeItem('contract-active-tab')
   }
@@ -164,7 +167,6 @@ export function ContractDashboard() {
     setCustomQuery("")
     setIsUploadMinimized(false)
 
-    // Clear all persisted data
     safeLocalStorage.removeItem('contract-data')
     safeLocalStorage.removeItem('api-config')
     safeLocalStorage.removeItem('analysis-type')
@@ -172,7 +174,6 @@ export function ContractDashboard() {
     safeLocalStorage.removeItem('contract-active-tab')
   }
 
-  // Show loading state while checking for persisted data
   if (isLoadingFromStorage) {
     return (
         <div className="min-h-screen bg-white flex items-center justify-center">
@@ -195,10 +196,12 @@ export function ContractDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      <path fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            clipRule="evenodd"/>
                     </svg>
                     <span className="text-blue-800 font-medium">
-                    Previous analysis restored from storage
+                    The analysis is stored on your local storage
                   </span>
                   </div>
                   <button
@@ -211,9 +214,11 @@ export function ContractDashboard() {
               </div>
           )}
 
-          {!apiConfig && (
-              <ApiConfigComponent onConfigChange={handleApiConfigChange} />
-          )}
+          {/* Always show API config - it will show compact view if configured */}
+          <ApiConfigComponent
+              onConfigChange={handleApiConfigChange}
+              existingConfig={apiConfig}
+          />
 
           <div className="mb-6 space-y-4">
             <div>

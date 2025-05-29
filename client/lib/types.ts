@@ -17,8 +17,6 @@ export interface Metric {
 
 export interface ApiConfig {
   openaiApiKey: string
-  qdrantApiKey: string
-  qdrantUrl: string
 }
 
 export interface AnalysisType {
