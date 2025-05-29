@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React, {useEffect} from "react"
 import { useState } from "react"
 import ReactMarkdown from "react-markdown"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -32,8 +32,73 @@ const tabConfig = [
     }
 ]
 
+// Helper function to safely use localStorage
+const safeLocalStorage = {
+    getItem: (key: string): string | null => {
+        if (typeof window !== 'undefined') {
+            try {
+                return localStorage.getItem(key)
+            } catch (error) {
+                console.warn('localStorage not available:', error)
+                return null
+            }
+        }
+        return null
+    },
+    setItem: (key: string, value: string): void => {
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.setItem(key, value)
+            } catch (error) {
+                console.warn('localStorage not available:', error)
+            }
+        }
+    },
+    removeItem: (key: string): void => {
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.removeItem(key)
+            } catch (error) {
+                console.warn('localStorage not available:', error)
+            }
+        }
+    }
+}
+
 export function TabbedDetails({ data }: TabbedDetailsProps) {
-    const [activeTab, setActiveTab] = useState("analysis")
+    const [activeTab, setActiveTab] = useState(() => {
+        return safeLocalStorage.getItem('contract-active-tab') || "analysis"
+    })
+
+    const [persistedData, setPersistedData] = useState<ContractData>(() => {
+        const stored = safeLocalStorage.getItem('contract-data')
+        return stored ? JSON.parse(stored) : data
+    })
+
+    // Track if data has been loaded from localStorage
+    const [isDataFromStorage, setIsDataFromStorage] = useState(false)
+
+    // Check if there's stored data on mount
+    useEffect(() => {
+        const storedData = safeLocalStorage.getItem('contract-data')
+        if (storedData) {
+            setIsDataFromStorage(true)
+        }
+    }, [])
+
+    // Persist active tab when it changes
+    useEffect(() => {
+        safeLocalStorage.setItem('contract-active-tab', activeTab)
+    }, [activeTab])
+
+    // Persist contract data when it changes (but only if it's new data)
+    useEffect(() => {
+        if (data && JSON.stringify(data) !== JSON.stringify(persistedData)) {
+            safeLocalStorage.setItem('contract-data', JSON.stringify(data))
+            setPersistedData(data)
+            setIsDataFromStorage(false)
+        }
+    }, [data, persistedData])
 
     const getTabContent = (tabId: string) => {
         switch (tabId) {
@@ -49,6 +114,14 @@ export function TabbedDetails({ data }: TabbedDetailsProps) {
     }
 
     const activeTabConfig = tabConfig.find(tab => tab.id === activeTab)
+
+    const handleClearStorage = () => {
+        safeLocalStorage.removeItem('contract-active-tab')
+        safeLocalStorage.removeItem('contract-data')
+        setActiveTab("analysis")
+        setPersistedData(data)
+        setIsDataFromStorage(false)
+    }
 
     return (
         <Card className="h-full shadow-lg bg-white border-0 overflow-hidden">
@@ -74,13 +147,22 @@ export function TabbedDetails({ data }: TabbedDetailsProps) {
                     <div className="p-6">
                         {/* Tab Header with Icon and Description */}
                         <div className="mb-6 pb-4 border-b border-gray-100">
-                            <div className="flex items-center gap-3 mb-2">
-                                {activeTabConfig?.icon && (
-                                    <activeTabConfig.icon className="h-5 w-5 text-indigo-600" />
-                                )}
-                                <h2 className="text-xl font-semibold text-gray-900">
-                                    {activeTabConfig?.label}
-                                </h2>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                    {activeTabConfig?.icon && (
+                                        <activeTabConfig.icon className="h-5 w-5 text-indigo-600" />
+                                    )}
+                                    <h2 className="text-xl font-semibold text-gray-900">
+                                        {activeTabConfig?.label}
+                                    </h2>
+                                </div>
+                                <button
+                                    onClick={handleClearStorage}
+                                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                                    title="Clear stored data"
+                                >
+                                    Reset
+                                </button>
                             </div>
                             <p className="text-sm text-gray-600">
                                 {activeTabConfig?.description}
@@ -124,11 +206,36 @@ export function TabbedDetails({ data }: TabbedDetailsProps) {
                                         </li>
                                     ),
                                     table: ({ children }) => (
-                                        <div className="overflow-x-auto mb-4">
-                                            <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm">
+                                        <div className="overflow-x-auto mb-6">
+                                            <table className="w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
                                                 {children}
                                             </table>
                                         </div>
+                                    ),
+                                    thead: ({ children }) => (
+                                        <thead className="bg-gray-50">
+                                        {children}
+                                        </thead>
+                                    ),
+                                    tbody: ({ children }) => (
+                                        <tbody className="divide-y divide-gray-100">
+                                        {children}
+                                        </tbody>
+                                    ),
+                                    th: ({ children }) => (
+                                        <th className="px-4 py-3 text-left font-semibold text-gray-900 text-sm border-r border-gray-200 last:border-r-0">
+                                            {children}
+                                        </th>
+                                    ),
+                                    td: ({ children }) => (
+                                        <td className="px-4 py-3 text-gray-700 text-sm border-r border-gray-200 last:border-r-0">
+                                            {children}
+                                        </td>
+                                    ),
+                                    tr: ({ children }) => (
+                                        <tr className="hover:bg-gray-50 transition-colors">
+                                            {children}
+                                        </tr>
                                     ),
                                     pre: ({ children }) => (
                                         <pre className="bg-gray-100 text-gray-800 p-4 rounded-md text-sm font-mono overflow-x-auto border mb-4">
