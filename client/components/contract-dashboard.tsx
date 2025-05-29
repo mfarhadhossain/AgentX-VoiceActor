@@ -232,8 +232,8 @@ export function ContractDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Contract Review">Contract Review</SelectItem>
-                  <SelectItem value="Legal Research">Legal Research</SelectItem>
                   <SelectItem value="Risk Assessment">Risk Assessment</SelectItem>
+                  <SelectItem value="Legal Research">Legal Research</SelectItem>
                   <SelectItem value="Custom Query">Custom Query</SelectItem>
                 </SelectContent>
               </Select>
