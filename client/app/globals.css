@@ -161,15 +161,38 @@ body {
   }
 
   .markdown-content table {
-    @apply w-full border-collapse mb-4;
+    @apply w-full border-collapse mb-6 bg-white rounded-lg overflow-hidden shadow-sm;
+    border: 1px solid #e5e7eb;
+  }
+
+  .markdown-content thead {
+    @apply bg-gray-50;
   }
 
   .markdown-content th {
-    @apply border border-gray-300 bg-gray-50 px-4 py-2 text-left font-semibold text-gray-900;
+    @apply border-b border-gray-200 px-4 py-3 text-left font-semibold text-gray-900 text-sm;
+    border-right: 1px solid #e5e7eb;
+  }
+
+  .markdown-content th:last-child {
+    @apply border-r-0;
   }
 
   .markdown-content td {
-    @apply border border-gray-300 px-4 py-2 text-gray-700;
+    @apply border-b border-gray-100 px-4 py-3 text-gray-700 text-sm;
+    border-right: 1px solid #e5e7eb;
+  }
+
+  .markdown-content td:last-child {
+    @apply border-r-0;
+  }
+
+  .markdown-content tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .markdown-content tbody tr:hover {
+    @apply bg-gray-50;
   }
 
   .markdown-content hr {
@@ -227,6 +250,15 @@ body {
 
   .dark .markdown-content td {
     @apply border-gray-600 text-gray-300;
+  }
+
+  .dark .markdown-content table {
+    @apply bg-gray-900;
+    border-color: #4b5563;
+  }
+
+  .dark .markdown-content tbody tr:hover {
+    @apply bg-gray-800;
   }
 
   .dark .markdown-content hr {

@@ -1,4 +1,4 @@
-import type {ApiConfig, AnalysisType, ContractData, Metric} from './types'
+import type {ApiConfig, AnalysisType, ContractData} from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8501'
 
@@ -10,15 +10,13 @@ export class ApiService {
     }
 
     async uploadAndAnalyze(file: File, analysisType: AnalysisType): Promise<ContractData> {
-        if (!this.config) {
-            throw new Error('API configuration not set')
+        if (!this.config?.openaiApiKey) {
+            throw new Error('OpenAI API key not configured')
         }
 
         const formData = new FormData()
         formData.append('file', file)
         formData.append('openai_api_key', this.config.openaiApiKey)
-        formData.append('qdrant_api_key', this.config.qdrantApiKey)
-        formData.append('qdrant_url', this.config.qdrantUrl)
         formData.append('analysis_type', analysisType.type)
 
         if (analysisType.customQuery) {

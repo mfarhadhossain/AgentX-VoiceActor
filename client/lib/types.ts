@@ -17,11 +17,9 @@ export interface Metric {
 
 export interface ApiConfig {
   openaiApiKey: string
-  qdrantApiKey: string
-  qdrantUrl: string
 }
 
 export interface AnalysisType {
-  type: "Contract Review" | "Legal Research" | "Risk Assessment" | "Compliance Check" | "Custom Query"
+  type: "Contract Review" | "Legal Research" | "Risk Assessment" | "Custom Query"
   customQuery?: string
 }
