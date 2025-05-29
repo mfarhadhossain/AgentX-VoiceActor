@@ -22,6 +22,6 @@ export interface ApiConfig {
 }
 
 export interface AnalysisType {
-  type: "Contract Review" | "Legal Research" | "Risk Assessment" | "Compliance Check" | "Custom Query"
+  type: "Contract Review" | "Legal Research" | "Risk Assessment" | "Custom Query"
   customQuery?: string
 }

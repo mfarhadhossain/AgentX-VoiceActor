@@ -229,7 +229,6 @@ export function ContractDashboard() {
                   <SelectItem value="Contract Review">Contract Review</SelectItem>
                   <SelectItem value="Legal Research">Legal Research</SelectItem>
                   <SelectItem value="Risk Assessment">Risk Assessment</SelectItem>
-                  <SelectItem value="Compliance Check">Compliance Check</SelectItem>
                   <SelectItem value="Custom Query">Custom Query</SelectItem>
                 </SelectContent>
               </Select>
