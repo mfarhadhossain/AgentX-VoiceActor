@@ -238,10 +238,11 @@ def main():
                                     knowledge=st.session_state.reference_db,
                                     search_knowledge=True,
                                     instructions=[
-                                        "Find and cite relevant legal cases and precedents",
+                                        "Find and cite relevant legal cases, precedents or frameworks",
+                                        "The PRAC3 risk assessment framework is in the knowledge base, in a paper titled 'PRAC3 (Privacy, Reputation, Accountability, Consent, Credit, Compensation):Long Tailed Risks of Voice Actors in AI Data-Economy',stands for Privacy, Reputation, Accountability, Consent, Credit, Compensation",
                                         "Provide detailed research summaries with sources",
                                         "Reference specific sections from the knowledge base",
-                                        "Always search the reference knowledge base for relevant information"
+                                        "Always search the knowledge base for relevant information"
                                     ],
                                     show_tool_calls=True,
                                     markdown=True
@@ -255,6 +256,7 @@ def main():
                                     search_knowledge=True,
                                     instructions=[
                                         "Review contracts thoroughly",
+                                        "Always rely on the legal researcher if need any external information, such as risk assessment framework or legal precedent",
                                         "Identify key terms and potential issues",
                                         "Reference specific clauses from the document"
                                     ],
@@ -269,6 +271,7 @@ def main():
                                     search_knowledge=True,
                                     instructions=[
                                         "Develop comprehensive legal strategies",
+                                        "Always rely on the legal researcher if need any external information"
                                         "Provide actionable recommendations",
                                         "Consider both risks and opportunities"
                                     ],
@@ -292,7 +295,7 @@ def main():
                                     add_datetime_to_instructions=True,
                                     instructions=[
                                         "Coordinate analysis between team members",
-                                        "The legal researcher can provide references but cannot see the exact uploaded contract",
+                                        "Always transfer the task to the legal researcher if need for external information, such as risk assessment framework or legal precedent",
                                         "Provide comprehensive responses",
                                         "Ensure all recommendations are properly sourced",
                                         "Reference specific parts of the uploaded document",
@@ -355,7 +358,7 @@ def main():
                 "description": "Research on relevant legal cases and precedents"
             },
             "Risk Assessment": {
-                "query": "Analyze potential legal risks and liabilities in this document based on common risk assessment frameworks such as NIST, OWASP, MITRE.",
+                "query": "Analyze potential legal risks and liabilities in the uploaded document based on common risk assessment frameworks such as NIST, OWASP and PRAC3. The PRAC3 risk assessment framework is in Legal Researcher's knowledge base.",
                 "agents": ["Legal Researcher", "Contract Analyst", "Legal Strategist"],
                 "description": "Combined risk analysis and strategic assessment"
             },
@@ -388,8 +391,29 @@ def main():
                         # Ensure OpenAI API key is set
                         os.environ['OPENAI_API_KEY'] = st.session_state.openai_api_key
                         
-                        # Combine predefined and user queries
-                        if analysis_type != "Custom Query":
+                        # Special handling for Risk Assessment
+                        if analysis_type == "Risk Assessment":
+                            combined_query = f"""
+                            Using the uploaded document as reference:
+                            
+                            Primary Analysis Task: {analysis_configs[analysis_type]['query']}
+                            Focus Areas: {', '.join(analysis_configs[analysis_type]['agents'])}
+                            
+                            Please provide your response in exactly two sections:
+                            
+                            ## Risk Review
+                            - Identify and analyze all potential legal risks and liabilities
+                            - Reference specific clauses or sections from the document
+                            - Categorize risks by severity and likelihood
+                            - Include compliance and regulatory risks
+                            
+                            ## Scoring
+                            Present a risk scoring table in markdown format with the following columns:
+                            | Risk Category | Description | Severity (1-10) | Likelihood (1-10) | Overall Score | Mitigation Priority |
+                            
+                            Please search the knowledge base and provide specific references from the document.
+                            """
+                        elif analysis_type != "Custom Query":
                             combined_query = f"""
                             Using the uploaded document as reference:
                             
@@ -410,49 +434,74 @@ def main():
 
                         response = st.session_state.legal_team.run(combined_query)
                         
-                        # Display results in tabs
-                        tabs = st.tabs(["Analysis", "Key Points", "Recommendations"])
-                        
-                        with tabs[0]:
-                            st.markdown("### Detailed Analysis")
-                            if response.content:
-                                st.markdown(response.content)
-                            else:
+                        # Display results in tabs - different for Risk Assessment
+                        if analysis_type == "Risk Assessment":
+                            tabs = st.tabs(["Risk Review", "Scoring"])
+                            
+                            # Parse the response to extract Risk Review and Scoring sections
+                            response_content = response.content if response.content else ""
+                            if not response_content:
                                 for message in response.messages:
                                     if message.role == 'assistant' and message.content:
-                                        st.markdown(message.content)
-                        
-                        with tabs[1]:
-                            st.markdown("### Key Points")
-                            key_points_response = st.session_state.legal_team.run(
-                                f"""Based on this previous analysis:    
-                                {response.content}
-                                
-                                Please summarize the key points in bullet points.
-                                Focus on insights from: {', '.join(analysis_configs[analysis_type]['agents'])}"""
-                            )
-                            if key_points_response.content:
-                                st.markdown(key_points_response.content)
-                            else:
-                                for message in key_points_response.messages:
-                                    if message.role == 'assistant' and message.content:
-                                        st.markdown(message.content)
-                        
-                        with tabs[2]:
-                            st.markdown("### Recommendations")
-                            recommendations_response = st.session_state.legal_team.run(
-                                f"""Based on this previous analysis:
-                                {response.content}
-                                
-                                What are your key recommendations based on the analysis, the best course of action?
-                                Provide specific recommendations from: {', '.join(analysis_configs[analysis_type]['agents'])}"""
-                            )
-                            if recommendations_response.content:
-                                st.markdown(recommendations_response.content)
-                            else:
-                                for message in recommendations_response.messages:
-                                    if message.role == 'assistant' and message.content:
-                                        st.markdown(message.content)
+                                        response_content = message.content
+                                        break
+                            
+                            # Split content by sections
+                            sections = response_content.split("## Scoring")
+                            risk_review_content = sections[0].replace("## Risk Review", "").strip()
+                            scoring_content = sections[1].strip() if len(sections) > 1 else "No scoring data available."
+                            
+                            with tabs[0]:
+                                st.markdown("### Risk Review")
+                                st.markdown(risk_review_content)
+                            
+                            with tabs[1]:
+                                st.markdown("### Risk Scoring")
+                                st.markdown(scoring_content)
+                        else:
+                            # Original tab structure for other analysis types
+                            tabs = st.tabs(["Analysis", "Key Points", "Recommendations"])
+                            
+                            with tabs[0]:
+                                st.markdown("### Detailed Analysis")
+                                if response.content:
+                                    st.markdown(response.content)
+                                else:
+                                    for message in response.messages:
+                                        if message.role == 'assistant' and message.content:
+                                            st.markdown(message.content)
+                            
+                            with tabs[1]:
+                                st.markdown("### Key Points")
+                                key_points_response = st.session_state.legal_team.run(
+                                    f"""Based on this previous analysis:    
+                                    {response.content}
+                                    
+                                    Please summarize the key points in bullet points.
+                                    Focus on insights from: {', '.join(analysis_configs[analysis_type]['agents'])}"""
+                                )
+                                if key_points_response.content:
+                                    st.markdown(key_points_response.content)
+                                else:
+                                    for message in key_points_response.messages:
+                                        if message.role == 'assistant' and message.content:
+                                            st.markdown(message.content)
+                            
+                            with tabs[2]:
+                                st.markdown("### Recommendations")
+                                recommendations_response = st.session_state.legal_team.run(
+                                    f"""Based on this previous analysis:
+                                    {response.content}
+                                    
+                                    What are your key recommendations based on the analysis, the best course of action?
+                                    Provide specific recommendations from: {', '.join(analysis_configs[analysis_type]['agents'])}"""
+                                )
+                                if recommendations_response.content:
+                                    st.markdown(recommendations_response.content)
+                                else:
+                                    for message in recommendations_response.messages:
+                                        if message.role == 'assistant' and message.content:
+                                            st.markdown(message.content)
 
                     except Exception as e:
                         st.error(f"Error during analysis: {str(e)}")
@@ -460,4 +509,4 @@ def main():
         st.info("Please upload a legal document to begin analysis")
 
 if __name__ == "__main__":
-    main() 
+    main()
