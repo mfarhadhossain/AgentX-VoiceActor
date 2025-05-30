@@ -4,14 +4,15 @@ import type React from "react"
 import {useEffect, useState} from "react"
 import ReactMarkdown from "react-markdown"
 import {Card, CardContent, CardHeader} from "@/components/ui/card"
-import type {ContractData} from "@/lib/types"
-import {FileText, Lightbulb, Target} from "lucide-react"
+import type {AnalysisType, ContractData} from "@/lib/types"
+import {AlertTriangle, BarChart3, FileText, Lightbulb, Target} from "lucide-react"
 
 interface TabbedDetailsProps {
     data: ContractData
+    analysisType?: AnalysisType
 }
 
-const tabConfig = [
+const standardTabConfig = [
     {
         id: "analysis",
         label: "Analysis",
@@ -29,6 +30,22 @@ const tabConfig = [
         label: "Recommendations",
         icon: Lightbulb,
         description: "Strategic recommendations"
+    }
+]
+
+
+const riskAssessmentTabConfig = [
+    {
+        id: "riskReview",
+        label: "Risk Review",
+        icon: AlertTriangle,
+        description: "Detailed risk analysis"
+    },
+    {
+        id: "scoring",
+        label: "Scoring",
+        icon: BarChart3,
+        description: "Risk scoring matrix"
     }
 ]
 
@@ -234,10 +251,17 @@ const TableComponent: React.FC<{ lines: string[] }> = ({lines}) => {
     )
 }
 
-export function TabbedDetails({data}: TabbedDetailsProps) {
-    // Load persisted tab and data on component mount
+export function TabbedDetails({data, analysisType}: TabbedDetailsProps) {
+    const isRiskAssessment = analysisType?.type === "Risk Assessment"
+    const tabConfig = isRiskAssessment ? riskAssessmentTabConfig : standardTabConfig
     const [activeTab, setActiveTab] = useState(() => {
-        return safeLocalStorage.getItem('contract-active-tab') || "analysis"
+        const storedTab = safeLocalStorage.getItem('contract-active-tab')
+        // Reset to first tab if switching between risk assessment and other types
+        const validTabs = tabConfig.map(t => t.id)
+        if (storedTab && validTabs.includes(storedTab)) {
+            return storedTab
+        }
+        return tabConfig[0].id
     })
 
     const [persistedData, setPersistedData] = useState<ContractData>(() => {
@@ -256,6 +280,15 @@ export function TabbedDetails({data}: TabbedDetailsProps) {
         }
     }, [])
 
+
+    // Reset tab when analysis type changes
+    useEffect(() => {
+        const validTabs = tabConfig.map(t => t.id)
+        if (!validTabs.includes(activeTab)) {
+            setActiveTab(tabConfig[0].id)
+        }
+    }, [analysisType, tabConfig, activeTab])
+
     // Persist active tab when it changes
     useEffect(() => {
         safeLocalStorage.setItem('contract-active-tab', activeTab)
@@ -271,15 +304,26 @@ export function TabbedDetails({data}: TabbedDetailsProps) {
     }, [data, persistedData])
 
     const getTabContent = (tabId: string) => {
-        switch (tabId) {
-            case "analysis":
-                return persistedData.analysis
-            case "keyPoints":
-                return persistedData.keyPoints
-            case "recommendations":
-                return persistedData.recommendations
-            default:
-                return ""
+        if (isRiskAssessment) {
+            switch (tabId) {
+                case "riskReview":
+                    return persistedData.analysis // Risk Review content
+                case "scoring":
+                    return persistedData.keyPoints // Scoring table
+                default:
+                    return ""
+            }
+        } else {
+            switch (tabId) {
+                case "analysis":
+                    return persistedData.analysis
+                case "keyPoints":
+                    return persistedData.keyPoints
+                case "recommendations":
+                    return persistedData.recommendations
+                default:
+                    return ""
+            }
         }
     }
 

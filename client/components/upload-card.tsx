@@ -19,6 +19,7 @@ const analysisSteps = [
   "Uploading document...",
   "Processing PDF content...",
   "Creating knowledge base...",
+  "Creating reference base...",
   "Initializing AI agents...",
   "Analyzing contract terms...",
   "Researching legal precedents...",
@@ -52,9 +53,15 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
         })
       }, 2000)
 
-      // Change step every 15-20 seconds
       stepInterval = setInterval(() => {
-        setCurrentStep(prev => (prev + 1) % analysisSteps.length)
+        setCurrentStep(prev => {
+          // Stop at the last step (don't cycle back)
+          if (prev >= analysisSteps.length - 1) {
+            clearInterval(stepInterval) // Clear the interval when we reach the last step
+            return analysisSteps.length - 1
+          }
+          return prev + 1
+        })
       }, 18000)
     } else {
       // Reset when analysis completes
