@@ -5,7 +5,7 @@ import {useEffect, useState} from "react"
 import ReactMarkdown from "react-markdown"
 import {Card, CardContent, CardHeader} from "@/components/ui/card"
 import type {AnalysisType, ContractData} from "@/lib/types"
-import {AlertTriangle, BarChart3, FileText, Lightbulb, Target} from "lucide-react"
+import {AlertTriangle, BarChart3, FileText, Handshake, Lightbulb, Target} from "lucide-react"
 
 interface TabbedDetailsProps {
     data: ContractData
@@ -26,10 +26,10 @@ const standardTabConfig = [
         description: "Important contract highlights"
     },
     {
-        id: "recommendations",
-        label: "Recommendations",
-        icon: Lightbulb,
-        description: "Strategic recommendations"
+        id: "negotiations",
+        label: "Negotiations",
+        icon: Handshake,
+        description: "Negotiation strategies and positions"
     }
 ]
 
@@ -84,6 +84,10 @@ const safeLocalStorage = {
 
 // Simple table parser that creates React components directly
 const parseAndRenderContent = (content: string) => {
+
+    if (!content || content === "") {
+        return [<p key="no-content" className="text-gray-500 italic">No content available</p>]
+    }
     const lines = content.split('\n')
     const elements: React.ReactNode[] = []
     let i = 0
@@ -319,8 +323,8 @@ export function TabbedDetails({data, analysisType}: TabbedDetailsProps) {
                     return persistedData.analysis
                 case "keyPoints":
                     return persistedData.keyPoints
-                case "recommendations":
-                    return persistedData.recommendations
+                case "negotiations":
+                    return persistedData.negotiations
                 default:
                     return ""
             }

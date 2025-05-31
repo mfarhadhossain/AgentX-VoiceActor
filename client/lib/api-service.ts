@@ -60,10 +60,9 @@ export class ApiService {
 
             // Return the simplified structure
             return {
-                analysis: data.analysis,
-                keyPoints: data.key_points,
-                recommendations: data.recommendations,
-                riskScore: data.risk_score
+                analysis: data.analysis || '',
+                keyPoints: data.key_points || '',
+                negotiations: data.negotiations || ''
             }
         } catch (error) {
             console.error("API call error:", error)

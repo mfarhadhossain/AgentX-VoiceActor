@@ -11,7 +11,7 @@ export function ProjectHeader() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Clontract</h1>
-              <p className="text-sm text-gray-500">Contract Risk Analysis Platform</p>
+              <p className="text-sm text-gray-500">AI-Powered Contract Analysis Platform</p>
             </div>
           </div>
         </div>
