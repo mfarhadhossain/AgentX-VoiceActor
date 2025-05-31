@@ -39,7 +39,7 @@ const riskAssessmentTabConfig = [
         id: "riskReview",
         label: "Risk Review",
         icon: AlertTriangle,
-        description: "Detailed risk analysis"
+        description: "Detailed risk review"
     },
     {
         id: "scoring",

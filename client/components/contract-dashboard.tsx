@@ -44,6 +44,40 @@ const safeLocalStorage = {
     }
 }
 
+// Helper functions for type-specific storage
+const getStorageKeyForAnalysisType = (analysisType: string, customQuery?: string): string => {
+    if (analysisType === "Custom Query" && customQuery) {
+        // Create a hash of the custom query to make it unique
+        const queryHash = btoa(customQuery).replace(/[^a-zA-Z0-9]/g, '').substring(0, 8)
+        return `contract-data-custom-${queryHash}`
+    }
+    return `contract-data-${analysisType.toLowerCase().replace(/\s+/g, '-')}`
+}
+
+const getStoredContractData = (analysisType: string, customQuery?: string): ContractData | null => {
+    const storageKey = getStorageKeyForAnalysisType(analysisType, customQuery)
+    const storedData = safeLocalStorage.getItem(storageKey)
+    if (storedData) {
+        try {
+            return JSON.parse(storedData)
+        } catch (error) {
+            console.warn('Error parsing stored contract data:', error)
+            return null
+        }
+    }
+    return null
+}
+
+const storeContractData = (data: ContractData, analysisType: string, customQuery?: string): void => {
+    const storageKey = getStorageKeyForAnalysisType(analysisType, customQuery)
+    safeLocalStorage.setItem(storageKey, JSON.stringify(data))
+}
+
+const removeContractData = (analysisType: string, customQuery?: string): void => {
+    const storageKey = getStorageKeyForAnalysisType(analysisType, customQuery)
+    safeLocalStorage.removeItem(storageKey)
+}
+
 export function ContractDashboard() {
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [contractData, setContractData] = useState<ContractData | null>(null)
@@ -57,14 +91,6 @@ export function ContractDashboard() {
     useEffect(() => {
         const loadPersistedData = () => {
             try {
-                // Load contract data
-                const storedContractData = safeLocalStorage.getItem('contract-data')
-                if (storedContractData) {
-                    const parsedData = JSON.parse(storedContractData)
-                    setContractData(parsedData)
-                    setIsUploadMinimized(true) // Minimize upload card if we have data
-                }
-
                 // Load API config (only OpenAI key now)
                 const storedApiConfig = safeLocalStorage.getItem('api-config')
                 if (storedApiConfig) {
@@ -82,9 +108,36 @@ export function ContractDashboard() {
                 if (storedAnalysisType) {
                     const parsedAnalysisType = JSON.parse(storedAnalysisType)
                     setAnalysisType(parsedAnalysisType)
-                }
 
-                // Load custom query
+                    // Load custom query if it's a custom query type
+                    if (parsedAnalysisType.type === "Custom Query") {
+                        const storedCustomQuery = safeLocalStorage.getItem('custom-query')
+                        if (storedCustomQuery) {
+                            setCustomQuery(storedCustomQuery)
+                            // Load contract data for this specific custom query
+                            const storedData = getStoredContractData(parsedAnalysisType.type, storedCustomQuery)
+                            if (storedData) {
+                                setContractData(storedData)
+                                setIsUploadMinimized(true)
+                            }
+                        }
+                    } else {
+                        // Load contract data for the analysis type
+                        const storedData = getStoredContractData(parsedAnalysisType.type)
+                        if (storedData) {
+                            setContractData(storedData)
+                            setIsUploadMinimized(true)
+                        }
+                    }
+                } else {
+                    // Load contract data for default analysis type
+                    const storedData = getStoredContractData("Contract Review")
+                    if (storedData) {
+                        setContractData(storedData)
+                        setIsUploadMinimized(true)
+                    }
+                }
+                // Load custom query separately in case analysis type is not custom query
                 const storedCustomQuery = safeLocalStorage.getItem('custom-query')
                 if (storedCustomQuery) {
                     setCustomQuery(storedCustomQuery)
@@ -98,6 +151,16 @@ export function ContractDashboard() {
 
         loadPersistedData()
     }, [])
+
+    // Load contract data when analysis type changes
+    useEffect(() => {
+        if (!isLoadingFromStorage) {
+            const queryForStorage = analysisType.type === "Custom Query" ? customQuery : undefined
+            const storedData = getStoredContractData(analysisType.type, queryForStorage)
+            setContractData(storedData)
+            setIsUploadMinimized(!!storedData)
+        }
+    }, [analysisType.type, customQuery, isLoadingFromStorage])
 
     // Persist API config when it changes
     useEffect(() => {
@@ -115,6 +178,8 @@ export function ContractDashboard() {
     useEffect(() => {
         if (customQuery) {
             safeLocalStorage.setItem('custom-query', customQuery)
+        } else {
+            safeLocalStorage.removeItem('custom-query')
         }
     }, [customQuery])
 
@@ -139,7 +204,9 @@ export function ContractDashboard() {
             const data = await apiService.uploadAndAnalyze(file, analysis)
             setContractData(data)
 
-            safeLocalStorage.setItem('contract-data', JSON.stringify(data))
+            // Store data with analysis type-specific key
+            const queryForStorage = analysisType.type === "Custom Query" ? customQuery : undefined
+            storeContractData(data, analysisType.type, queryForStorage)
 
             setIsUploadMinimized(true)
         } catch (error) {
@@ -155,7 +222,10 @@ export function ContractDashboard() {
         setIsUploadMinimized(false)
         setIsAnalyzing(false)
 
-        safeLocalStorage.removeItem('contract-data')
+        // Remove contract data for current analysis type
+        const queryForStorage = analysisType.type === "Custom Query" ? customQuery : undefined
+        removeContractData(analysisType.type, queryForStorage)
+
         safeLocalStorage.removeItem('contract-active-tab')
     }
 
@@ -166,11 +236,22 @@ export function ContractDashboard() {
         setCustomQuery("")
         setIsUploadMinimized(false)
 
-        safeLocalStorage.removeItem('contract-data')
+        // Clear all analysis type data
+        const analysisTypes = ["Contract Review", "Risk Assessment", "Legal Research", "Compliance Check"]
+        analysisTypes.forEach(type => {
+            removeContractData(type)
+        })
+
         safeLocalStorage.removeItem('api-config')
         safeLocalStorage.removeItem('analysis-type')
         safeLocalStorage.removeItem('custom-query')
         safeLocalStorage.removeItem('contract-active-tab')
+    }
+
+
+    const hasStoredData = () => {
+        const queryForStorage = analysisType.type === "Custom Query" ? customQuery : undefined
+        return !!getStoredContractData(analysisType.type, queryForStorage)
     }
 
     if (isLoadingFromStorage) {
@@ -190,7 +271,7 @@ export function ContractDashboard() {
 
             <div className="container mx-auto px-4 py-8 max-w-7xl">
                 {/* Show data persistence indicator if we have stored data */}
-                {contractData && safeLocalStorage.getItem('contract-data') && (
+                {contractData && hasStoredData() && (
                     <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -200,8 +281,8 @@ export function ContractDashboard() {
                                           clipRule="evenodd"/>
                                 </svg>
                                 <span className="text-blue-800 font-medium">
-                    The analysis is stored on your local storage
-                  </span>
+                                 Analysis for "{analysisType.type}" is stored locally
+                                </span>
                             </div>
                             <button
                                 onClick={handleClearAllData}
@@ -240,14 +321,26 @@ export function ContractDashboard() {
 
                     {analysisType.type === "Custom Query" && (
                         <div>
-                            <Label htmlFor="custom-query">Custom Query</Label>
+                            <Label htmlFor="custom-query">Custom Query *</Label>
                             <Textarea
                                 id="custom-query"
                                 value={customQuery}
                                 onChange={(e) => setCustomQuery(e.target.value)}
                                 placeholder="Enter your specific legal analysis query..."
                                 rows={3}
+                                required
+                                className={customQuery.trim() ? '' : 'border-red-300 focus:border-red-500'}
                             />
+                            <div className="flex justify-between items-center mt-1">
+                                <p className="text-xs text-gray-500">
+                                    Each unique custom query will have its own stored analysis
+                                </p>
+                                {!customQuery.trim() && (
+                                    <p className="text-xs text-red-500">
+                                        Custom query is required
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -259,14 +352,12 @@ export function ContractDashboard() {
                         isMinimized={isUploadMinimized}
                         onNewUpload={handleNewUpload}
                         hasContract={!!contractData}
+                        disabled={analysisType.type === "Custom Query" && !customQuery.trim()}
                     />
                 </div>
 
                 {contractData && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/*<div className="lg:col-span-1">*/}
-                        {/*  <RiskScoreCard data={contractData} />*/}
-                        {/*</div>*/}
                         <div className="lg:col-span-3">
                             <TabbedDetails
                                 data={contractData}

@@ -13,6 +13,7 @@ interface UploadCardProps {
   isMinimized: boolean
   onNewUpload: () => void
   hasContract: boolean
+  disabled?: boolean
 }
 
 const analysisSteps = [
@@ -27,7 +28,14 @@ const analysisSteps = [
   "Finalizing analysis..."
 ]
 
-export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload, hasContract }: UploadCardProps) {
+export function UploadCard({
+                             onFileUpload,
+                             isAnalyzing,
+                             isMinimized,
+                             onNewUpload,
+                             hasContract,
+                             disabled = false
+}: UploadCardProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -41,7 +49,6 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
     let stepInterval: NodeJS.Timeout
 
     if (isAnalyzing) {
-      // Reset progress when analysis starts
       setCurrentStep(0)
       setProgress(0)
 
@@ -49,22 +56,20 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
       interval = setInterval(() => {
         setProgress(prev => {
           if (prev >= 95) return prev // Stop at 95% until real completion
-          return prev + Math.random() * 2 + 0.5 // Gradually increase
+          return prev + Math.random() * 2 + 0.5
         })
       }, 2000)
 
       stepInterval = setInterval(() => {
         setCurrentStep(prev => {
-          // Stop at the last step (don't cycle back)
           if (prev >= analysisSteps.length - 1) {
-            clearInterval(stepInterval) // Clear the interval when we reach the last step
+            clearInterval(stepInterval)
             return analysisSteps.length - 1
           }
           return prev + 1
         })
       }, 18000)
     } else {
-      // Reset when analysis completes
       if (hasContract) {
         setProgress(100)
         setCurrentStep(analysisSteps.length - 1)
@@ -94,6 +99,8 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
     e.preventDefault()
     setIsDragging(false)
 
+    if (disabled) return
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0]
       setSelectedFile(file)
@@ -102,6 +109,8 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return
+
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
       setSelectedFile(file)
@@ -110,6 +119,7 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
   }
 
   const handleButtonClick = () => {
+    if (disabled) return
     fileInputRef.current?.click()
   }
 
@@ -120,7 +130,6 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
     setCurrentStep(0)
   }
 
-  // Don't minimize during analysis - keep it expanded to show progress
   const shouldMinimize = isMinimized && !isAnalyzing && !isExpanded
 
   // Minimized view (only when not analyzing)
@@ -239,12 +248,15 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
               className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg transition-all duration-200 ${
                   isAnalyzing
                       ? "border-gray-300 bg-gray-50"
+                      : disabled
+                      ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
                       : "border-gray-200 hover:border-indigo-300"
               }`}
-              onDragOver={!isAnalyzing ? handleDragOver : undefined}
-              onDragLeave={!isAnalyzing ? handleDragLeave : undefined}
-              onDrop={!isAnalyzing ? handleDrop : undefined}
+              onDragOver={!isAnalyzing && !disabled ? handleDragOver : undefined}
+              onDragLeave={!isAnalyzing && !disabled ? handleDragLeave : undefined}
+              onDrop={!isAnalyzing && !disabled ? handleDrop : undefined}
           >
+
             {isAnalyzing ? (
                 <>
                   <CheckCircle className="w-12 h-12 mb-4 text-green-500" />
@@ -264,6 +276,7 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
                       onClick={handleButtonClick}
                       size="lg"
                       className="font-semibold bg-indigo-600 hover:bg-indigo-700 text-white h-12 px-6 min-w-[160px]"
+                      disabled={disabled}
                   >
                     <FileUp className="mr-2 h-5 w-5" /> Select File
                   </Button>
@@ -276,7 +289,7 @@ export function UploadCard({ onFileUpload, isAnalyzing, isMinimized, onNewUpload
                 onChange={handleFileChange}
                 className="hidden"
                 accept=".pdf,.doc,.docx,.txt"
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || disabled}
             />
             {selectedFile && !isAnalyzing && (
                 <p className="mt-4 text-sm text-gray-600">Selected: {selectedFile.name}</p>

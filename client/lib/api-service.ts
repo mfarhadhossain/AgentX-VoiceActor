@@ -23,15 +23,6 @@ export class ApiService {
             formData.append('custom_query', analysisType.customQuery)
         }
 
-        // Log the request details
-        console.log("Sending analysis request:", {
-            file: file.name,
-            fileSize: file.size,
-            analysisType: analysisType.type,
-            hasCustomQuery: !!analysisType.customQuery,
-            apiUrl: `${API_BASE_URL}/api/analyze`
-        });
-
         try {
             const response = await fetch(`${API_BASE_URL}/api/analyze`, {
                 method: 'POST',
@@ -39,8 +30,6 @@ export class ApiService {
             })
 
             const responseText = await response.text()
-            console.log("Response status:", response.status)
-            console.log("Response text:", responseText)
 
             if (!response.ok) {
                 // Try to parse error details
@@ -56,7 +45,6 @@ export class ApiService {
 
             // Parse successful response
             const data = JSON.parse(responseText)
-            console.log("Parsed response data:", data)
 
             // Return the simplified structure
             return {
