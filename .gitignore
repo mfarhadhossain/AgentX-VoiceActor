@@ -2,3 +2,5 @@
 /agent/qdrant_storage
 /agent/venv
 /venv
+
+/.idea
