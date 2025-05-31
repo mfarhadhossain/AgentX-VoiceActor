@@ -10,6 +10,7 @@ import {Textarea} from "@/components/ui/textarea"
 import {Label} from "@/components/ui/label"
 import type {AnalysisType, ApiConfig, ContractData} from "@/lib/types"
 import {apiService} from "@/lib/api-service"
+import { toast } from "@/hooks/use-toast"
 
 // Helper function to safely use localStorage
 const safeLocalStorage = {
@@ -190,7 +191,11 @@ export function ContractDashboard() {
 
     const handleFileUpload = async (file: File) => {
         if (!apiConfig?.openaiApiKey) {
-            alert("Please configure your OpenAI API key first")
+            toast({
+                title: "API Key Required",
+                description: "Please configure your OpenAI API key first.",
+                variant: "destructive"
+            })
             return
         }
 
@@ -204,6 +209,12 @@ export function ContractDashboard() {
             const data = await apiService.uploadAndAnalyze(file, analysis)
             setContractData(data)
 
+            toast({
+                title: "Analysis Complete",
+                description: "Your contract has been successfully analyzed.",
+                variant: "default"
+            })
+
             // Store data with analysis type-specific key
             const queryForStorage = analysisType.type === "Custom Query" ? customQuery : undefined
             storeContractData(data, analysisType.type, queryForStorage)
@@ -211,7 +222,11 @@ export function ContractDashboard() {
             setIsUploadMinimized(true)
         } catch (error) {
             console.error("Analysis failed:", error)
-            alert("Analysis failed. Please check your API configuration and try again.")
+            toast({
+                title: "Analysis Failed",
+                description: "Please check your API configuration and try again.",
+                variant: "destructive"
+            })
         } finally {
             setIsAnalyzing(false)
         }
